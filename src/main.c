@@ -6,14 +6,38 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <X11/Xlib.h>
+
+#define APPNAME "xlib-keyboard-hack"
 
 int main(int argc, char **argv)
 {
+	const char *home_dir = getenv("HOME");
+	
+	// paths to files
+	// TODO cache scripts contents to prevent reading from fs every times
+	char hack_key_cfg[256];
+	char hack_on_bin[256];
+	char hack_off_bin[256];
+	
+	char bin_dir[256];
+	strcpy(bin_dir, home_dir);
+	strcat(bin_dir, "/.local/bin");
+	
+	strcpy(hack_on_bin, bin_dir);
+	strcat(hack_on_bin, "/." APPNAME "-on.sh");
+	
+	strcpy(hack_off_bin, bin_dir);
+	strcat(hack_off_bin, "/." APPNAME "-off.sh");
+	
+	strcpy(hack_key_cfg, home_dir);
+	strcat(hack_key_cfg, "/." APPNAME "-key");
+	
 	Display *dpy = XOpenDisplay(NULL);
 	Window wnd = DefaultRootWindow(dpy);
 	
-	const int hack_key_num = 37;
+	const int hack_key_num = 133; // TODO read key num from cfg file
 	
 	int last_hack_key_state = 0;
 	char keys_return[32];
@@ -45,28 +69,17 @@ int main(int argc, char **argv)
 		}
 		
 		if (cur_hack_key_state != last_hack_key_state) {
+			
 			last_hack_key_state = cur_hack_key_state;
 			
 			if (last_hack_key_state == 1) {
 				
-				system("xmodmap -e 'keycode 113 = Home'");
-				system("xmodmap -e 'keycode 114 = End'");
-				system("xmodmap -e 'keycode 111 = Prior'");
-				system("xmodmap -e 'keycode 116 = Next'");
-				
-				system("xmodmap -e 'keycode 105 = Menu'");
-				
+				system(hack_on_bin);
 				printf("On\n");
 				
 			} else {
 				
-				system("xmodmap -e 'keycode 113 = Left'");
-				system("xmodmap -e 'keycode 114 = Right'");
-				system("xmodmap -e 'keycode 111 = Up'");
-				system("xmodmap -e 'keycode 116 = Down'");
-				
-				system("xmodmap -e 'keycode 105 = Insert'");
-				
+				system(hack_off_bin);
 				printf("Off\n");
 			}
 		}
