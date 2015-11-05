@@ -5,52 +5,75 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <X11/Xlib.h>
-#include <X11/Xutil.h>
 
 int main(int argc, char **argv)
 {
-	Display *dpy = XOpenDisplay(0);
+	Display *dpy = XOpenDisplay(NULL);
 	Window wnd = DefaultRootWindow(dpy);
 	
-	int keycode = XKeysymToKeycode(dpy, XK_Super_L);
-	int last_status = 0;
+	const int hack_key_num = 37;
 	
-	XGrabKey(dpy, keycode, 0, wnd, 1, GrabModeAsync, GrabModeAsync);
-	
-	XEvent ev;
+	int last_hack_key_state = 0;
+	char keys_return[32];
 	while (1) {
 		
-		XSelectInput(dpy, wnd, KeyPressMask);
-		XNextEvent(dpy, &ev);
+		XQueryKeymap(dpy, keys_return);
+		int cur_hack_key_state = 0;
 		
-		if (ev.type != KeyPress || ev.xkey.keycode != keycode) {
-			continue;
+		for (int i=0; i<32; i++) {
+			
+			if (keys_return[i] != 0) {
+				
+				int pos = 0;
+				int num = keys_return[i];
+				
+				while (pos < 8) {
+					
+					if ((num & 0x01) == 1) {
+						int key_num = i*8+pos;
+						if (key_num == hack_key_num) {
+							cur_hack_key_state = 1;
+						}
+					}
+					
+					++pos;
+					num /= 2;
+				}
+			}
 		}
 		
-		if (last_status == 0) {
+		if (cur_hack_key_state != last_hack_key_state) {
+			last_hack_key_state = cur_hack_key_state;
 			
-			system("xmodmap -e 'keycode 113 = Home'");
-			system("xmodmap -e 'keycode 114 = End'");
-			system("xmodmap -e 'keycode 111 = Prior'");
-			system("xmodmap -e 'keycode 116 = Next'");
-			
-			system("xmodmap -e 'keycode 105 = Menu'");
-			
-			last_status = 1;
-			
-		} else {
-			
-			system("xmodmap -e 'keycode 113 = Left'");
-			system("xmodmap -e 'keycode 114 = Right'");
-			system("xmodmap -e 'keycode 111 = Up'");
-			system("xmodmap -e 'keycode 116 = Down'");
-			
-			system("xmodmap -e 'keycode 105 = Insert'");
-			
-			last_status = 0;
+			if (last_hack_key_state == 1) {
+				
+				system("xmodmap -e 'keycode 113 = Home'");
+				system("xmodmap -e 'keycode 114 = End'");
+				system("xmodmap -e 'keycode 111 = Prior'");
+				system("xmodmap -e 'keycode 116 = Next'");
+				
+				system("xmodmap -e 'keycode 105 = Menu'");
+				
+				printf("On\n");
+				
+			} else {
+				
+				system("xmodmap -e 'keycode 113 = Left'");
+				system("xmodmap -e 'keycode 114 = Right'");
+				system("xmodmap -e 'keycode 111 = Up'");
+				system("xmodmap -e 'keycode 116 = Down'");
+				
+				system("xmodmap -e 'keycode 105 = Insert'");
+				
+				printf("Off\n");
+			}
 		}
+		
+		usleep(30000); // idle
 	}
 	
+	XCloseDisplay(dpy);
 	return EXIT_SUCCESS;
 }
