@@ -61,39 +61,48 @@ int read_cfg_key_num(char *path)
 	return v;
 }
 
-int main(int argc, char **argv)
+typedef struct {
+	char on_key_cfg[255];
+	char off_key_cfg[255];
+	char on_bin[255];
+	char off_bin[255];
+} paths;
+
+paths get_paths()
 {
+	paths my_paths;
 	const char *home_dir = getenv("HOME");
-	
-	// TODO support on/off mode by different keys
-	
-	// paths to files
-	// TODO cache scripts contents to prevent reading from fs every times
-	char hack_on_key_cfg_path[256];
-	char hack_off_key_cfg_path[256];
-	char hack_on_bin[256];
-	char hack_off_bin[256];
 	
 	char bin_dir[256];
 	strcpy(bin_dir, home_dir);
 	strcat(bin_dir, "/.local/bin");
 	
 	// ON bin
-	strcpy(hack_on_bin, bin_dir);
-	strcat(hack_on_bin, "/" BIN_ON_FILENAME);
-	
+	strcpy(my_paths.on_bin, bin_dir);
+	strcat(my_paths.on_bin, "/" BIN_ON_FILENAME);
 	// OFF bin
-	strcpy(hack_off_bin, bin_dir);
-	strcat(hack_off_bin, "/" BIN_OFF_FILENAME);
+	strcpy(my_paths.off_bin, bin_dir);
+	strcat(my_paths.off_bin, "/" BIN_OFF_FILENAME);
 	
 	// ON key
-	strcpy(hack_on_key_cfg_path, home_dir);
-	strcat(hack_on_key_cfg_path, "/" CFG_ON_KEY_FILENAME);
+	strcpy(my_paths.on_key_cfg, home_dir);
+	strcat(my_paths.on_key_cfg, "/" CFG_ON_KEY_FILENAME);
 	// OFF key
-	strcpy(hack_off_key_cfg_path, home_dir);
-	strcat(hack_off_key_cfg_path, "/" CFG_OFF_KEY_FILENAME);
+	strcpy(my_paths.off_key_cfg, home_dir);
+	strcat(my_paths.off_key_cfg, "/" CFG_OFF_KEY_FILENAME);
 	
-	const int key_on_num = read_cfg_key_num(hack_on_key_cfg_path);
+	return my_paths;
+}
+
+int main(int argc, char **argv)
+{
+	
+	// TODO cache scripts contents to prevent reading from fs every times
+	// TODO support on/off mode by different keys
+	
+	paths my_paths = get_paths();
+	
+	const int key_on_num = read_cfg_key_num(my_paths.on_key_cfg);
 	
 	Display *dpy = XOpenDisplay(NULL);
 	Window wnd = DefaultRootWindow(dpy);
@@ -133,12 +142,12 @@ int main(int argc, char **argv)
 			
 			if (last_hack_key_state == 1) {
 				
-				system(hack_on_bin);
+				system(my_paths.on_bin);
 				printf("On\n");
 				
 			} else {
 				
-				system(hack_off_bin);
+				system(my_paths.off_bin);
 				printf("Off\n");
 			}
 		}
