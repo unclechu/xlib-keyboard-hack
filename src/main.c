@@ -16,8 +16,11 @@
 #define  BIN_OFF_FILENAME      "." APPNAME "-off.sh"
 
 #define  SLEEP_TIME            30000
+#define  FILE_SIZE             10000
 
-int read_cfg_key_num(char *path)
+#define  SHELL                 "/bin/bash"
+
+int read_cfg_key_num(const char *path)
 {
 	char key_num_str[16] = {'\0'};
 	FILE *fp;
@@ -94,15 +97,68 @@ paths get_paths()
 	return my_paths;
 }
 
+char* read_file_to_str(const char *path)
+{
+	char *str = (char*)malloc(sizeof(char) * FILE_SIZE);
+	FILE *fp;
+	
+	fp = fopen(path, "r");
+	if (fp == NULL) {
+		fprintf(stderr, "Can't read file '%s'\n", path);
+		perror("fopen");
+		exit(EXIT_FAILURE);
+	}
+	
+	str[0] = '\0';
+	for (int i=0; i<FILE_SIZE; ) {
+		
+		char ch = fgetc(fp);
+		
+		if (ch == EOF || i == FILE_SIZE - 1) {
+			str[i++] = '\0';
+			break;
+		}
+		
+		str[i++] = ch;
+	}
+	
+	fclose(fp);
+	return str;
+}
+
+void run_script(const char *script_code)
+{
+	const pid_t child_pid = fork();
+	
+	if (child_pid < 0) {
+		fprintf(stderr, "Can't fork.\n");
+		perror("fork");
+		exit(EXIT_FAILURE);
+	}
+	
+	// parent process
+	if (child_pid != 0) {
+		return;
+	}
+	
+	if (execl(SHELL, SHELL, "-c", script_code, NULL) == -1) {
+		fprintf(stderr, "Bash-script execution error.\n");
+		perror("execl");
+		exit(EXIT_FAILURE);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	
-	// TODO cache scripts contents to prevent reading from fs every times
 	// TODO support on/off mode by different keys
 	
-	paths my_paths = get_paths();
+	const paths my_paths = get_paths();
 	
 	const int key_on_num = read_cfg_key_num(my_paths.on_key_cfg);
+	
+	const char* on_bin_cache = read_file_to_str(my_paths.on_bin);
+	const char* off_bin_cache = read_file_to_str(my_paths.off_bin);
 	
 	Display *dpy = XOpenDisplay(NULL);
 	Window wnd = DefaultRootWindow(dpy);
@@ -142,12 +198,12 @@ int main(int argc, char **argv)
 			
 			if (last_hack_key_state == 1) {
 				
-				system(my_paths.on_bin);
+				run_script(on_bin_cache);
 				printf("On\n");
 				
 			} else {
 				
-				system(my_paths.off_bin);
+				run_script(off_bin_cache);
 				printf("Off\n");
 			}
 		}
