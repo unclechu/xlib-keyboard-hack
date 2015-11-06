@@ -148,14 +148,72 @@ void run_script(const char *script_code)
 	}
 }
 
-int main(int argc, char **argv)
+void show_help()
 {
+	const paths my_paths = get_paths();
 	
-	// TODO support on/off mode by different keys
+	printf(
+		"Usage\n"
+		"=====\n"
+		"  -h --help\n"
+		"    Shows this info.\n"
+		"  -t --toggle\n"
+		"    Toggle switch mode by two keys (first switching on, second switching off)\n"
+		"  -m --modifier\n"
+		"    Modifier key mode, when pressed then switching on, and switching off when released.\n"
+		"-----\n"
+		"Create this bash scripts with on/off actions:\n"
+		"  On: %s\n"
+		"  Off: %s\n"
+		"-----\n"
+		"Create this files with numbers of keys to on/off:\n"
+		"  On: %s\n"
+		"  Off (only for --toggle mode): %s\n",
+		my_paths.on_bin, my_paths.off_bin,
+		my_paths.on_key_cfg, my_paths.off_key_cfg
+	);
+}
+
+typedef enum { TOGGLE, MODIFIER } app_mode;
+
+int main(const int argc, const char **argv)
+{
+	if (argc > 2) {
+		fprintf(stderr, "Unexpected arguments count.\n");
+		return EXIT_FAILURE;
+	}
+	
+	if (argc != 2) {
+		show_help();
+		return EXIT_FAILURE;
+	}
+	
+	app_mode mode;
+	
+	if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
+		show_help();
+		return EXIT_SUCCESS;
+	} else if (strcmp(argv[1], "-t") == 0 || strcmp(argv[1], "--toggle") == 0) {
+		printf("Started with toggle switching mode.\n");
+		mode = TOGGLE;
+	} else if (strcmp(argv[1], "-m") == 0 || strcmp(argv[1], "--modifier") == 0) {
+		printf("Started with modifier mode.\n");
+		mode = MODIFIER;
+	} else {
+		fprintf(stderr, "Unrecognized argument: '%s'.\n", argv[1]);
+		show_help();
+		return EXIT_FAILURE;
+	}
 	
 	const paths my_paths = get_paths();
 	
 	const int key_on_num = read_cfg_key_num(my_paths.on_key_cfg);
+	const int key_off_num = (mode == TOGGLE) ? read_cfg_key_num(my_paths.off_key_cfg) : -1;
+	
+	printf("On-key number: %d\n", key_on_num);
+	if (mode == TOGGLE) {
+		printf("Off-key number: %d\n", key_off_num);
+	}
 	
 	const char* on_bin_cache = read_file_to_str(my_paths.on_bin);
 	const char* off_bin_cache = read_file_to_str(my_paths.off_bin);
@@ -163,12 +221,14 @@ int main(int argc, char **argv)
 	Display *dpy = XOpenDisplay(NULL);
 	Window wnd = DefaultRootWindow(dpy);
 	
-	int last_hack_key_state = 0;
+	int last_state = 0;
 	char keys_return[32];
 	while (1) {
 		
 		XQueryKeymap(dpy, keys_return);
-		int cur_hack_key_state = 0;
+		
+		int on_key_state = 0;
+		int off_key_state = 0;
 		
 		for (int i=0; i<32; i++) {
 			
@@ -182,7 +242,10 @@ int main(int argc, char **argv)
 					if ((num & 0x01) == 1) {
 						int key_num = i*8+pos;
 						if (key_num == key_on_num) {
-							cur_hack_key_state = 1;
+							on_key_state = 1;
+						}
+						if (mode == TOGGLE && key_num == key_off_num) {
+							off_key_state = 1;
 						}
 					}
 					
@@ -192,20 +255,38 @@ int main(int argc, char **argv)
 			}
 		}
 		
-		if (cur_hack_key_state != last_hack_key_state) {
+		if (mode == TOGGLE) {
 			
-			last_hack_key_state = cur_hack_key_state;
-			
-			if (last_hack_key_state == 1) {
-				
-				run_script(on_bin_cache);
-				printf("On\n");
-				
+			if (last_state == 0) {
+				if (on_key_state == 1) {
+					last_state = 1;
+					run_script(on_bin_cache);
+					printf("On\n");
+				}
 			} else {
-				
-				run_script(off_bin_cache);
-				printf("Off\n");
+				if (off_key_state == 1) {
+					last_state = 0;
+					run_script(off_bin_cache);
+					printf("Off\n");
+				}
 			}
+			
+		} else if (mode == MODIFIER) {
+			
+			if (last_state != on_key_state) {
+				last_state = on_key_state;
+				if (last_state == 1) {
+					run_script(on_bin_cache);
+					printf("On\n");
+				} else {
+					run_script(off_bin_cache);
+					printf("Off\n");
+				}
+			}
+			
+		} else {
+			fprintf(stderr, "Unknown mode\n");
+			return EXIT_FAILURE;
 		}
 		
 		usleep(SLEEP_TIME); // idle
