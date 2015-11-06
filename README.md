@@ -37,6 +37,14 @@ More usage info
 $ ./build/xlib-keyboard-hack -h
 ```
 
+You need to create two bash-scripts with on-action and off-action.
+
+Also you need to put number of key to on-key configuration file,
+and put number of key to off-key configuration file too
+if you're using `--toggle` mode.
+
+Start app with `--help` to see paths of this files.
+
 Author
 ------
 
