@@ -221,6 +221,7 @@ int main(const int argc, const char **argv)
 	Display *dpy = XOpenDisplay(NULL);
 	Window wnd = DefaultRootWindow(dpy);
 	
+	int last_key_state = 0; // when is --toggle mode and on/off keys is same
 	int last_state = 0;
 	char keys_return[32];
 	while (1) {
@@ -256,6 +257,22 @@ int main(const int argc, const char **argv)
 		}
 		
 		if (mode == TOGGLE) {
+			
+			// if on and off keys is same key
+			if (key_on_num == key_off_num) {
+				if (last_key_state == 1 && on_key_state == 0) {
+					last_key_state = 0;
+					on_key_state = 0;
+					off_key_state = 0;
+				} else if (last_key_state == 0 && on_key_state == 1) {
+					last_key_state = 1;
+					on_key_state = 1;
+					off_key_state = 1;
+				} else {
+					on_key_state = 0;
+					off_key_state = 0;
+				}
+			}
 			
 			if (last_state == 0) {
 				if (on_key_state == 1) {
