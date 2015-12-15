@@ -6,6 +6,7 @@ $(NAME): clean
 	gcc \
 		./src/main.c \
 		-lX11 \
+		-std=c99 \
 		-o "$(BUILD_DIR)/$(NAME)"
 
 clean:
