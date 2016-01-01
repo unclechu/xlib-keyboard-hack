@@ -7,7 +7,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+
 #include <X11/Xlib.h>
+#include <X11/extensions/XTest.h>
 
 #define  APPNAME               "xlib-keyboard-hack"
 #define  CFG_ON_KEY_FILENAME   "." APPNAME "-on-key"
@@ -19,6 +21,8 @@
 #define  FILE_SIZE             10000
 
 #define  SHELL                 "/bin/bash"
+
+#define  KEYS_LIMIT            16
 
 int read_cfg_key_num(const char *path)
 {
@@ -176,6 +180,19 @@ void show_help()
 
 typedef enum { TOGGLE, MODIFIER } app_mode;
 
+/* #include <X11/keysym.h> */
+void trig_off_keys(
+	Display *dpy,
+	const int *stored_keys_count,
+	const int *stored_keys
+) {
+	for (int i=0; i<(*stored_keys_count); i++) {
+		printf("Trigger key-off for keycode: %d\n", stored_keys[i]);
+		XTestFakeKeyEvent(dpy, stored_keys[i], False, 0);
+		XFlush(dpy);
+	}
+}
+
 int main(const int argc, const char **argv)
 {
 	if (argc > 2) {
@@ -207,31 +224,38 @@ int main(const int argc, const char **argv)
 	
 	const paths my_paths = get_paths();
 	
-	const int key_on_num = read_cfg_key_num(my_paths.on_key_cfg);
-	const int key_off_num = (mode == TOGGLE) ? read_cfg_key_num(my_paths.off_key_cfg) : -1;
+	const int key_on_num  = read_cfg_key_num(my_paths.on_key_cfg);
+	const int key_off_num =
+		(mode == TOGGLE) ? read_cfg_key_num(my_paths.off_key_cfg) : -1;
 	
 	printf("On-key number: %d\n", key_on_num);
 	if (mode == TOGGLE) {
 		printf("Off-key number: %d\n", key_off_num);
 	}
 	
-	const char* on_bin_cache = read_file_to_str(my_paths.on_bin);
+	const char* on_bin_cache  = read_file_to_str(my_paths.on_bin);
 	const char* off_bin_cache = read_file_to_str(my_paths.off_bin);
 	
 	Display *dpy = XOpenDisplay(NULL);
-	Window wnd = DefaultRootWindow(dpy);
+	Window   wnd = DefaultRootWindow(dpy);
 	
-	int last_key_state = 0; // when is --toggle mode and on/off keys is same
-	int last_state = 0;
-	char keys_return[32];
+	int  last_key_state = 0; // when is --toggle mode and on/off keys is same
+	int  last_state     = 0;
+	char keys_return[KEYS_LIMIT];
 	while (1) {
 		
 		XQueryKeymap(dpy, keys_return);
 		
-		int on_key_state = 0;
+		int on_key_state  = 0;
 		int off_key_state = 0;
 		
-		for (int i=0; i<32; i++) {
+		// for triggering keyoffs
+		int stored_keys[KEYS_LIMIT];
+		int stored_keys_count = 0;
+		
+		int is_off_triggered = 0;
+		
+		for (int i=0; i<KEYS_LIMIT; i++) {
 			
 			if (keys_return[i] != 0) {
 				
@@ -241,12 +265,18 @@ int main(const int argc, const char **argv)
 				while (pos < 8) {
 					
 					if ((num & 0x01) == 1) {
+						
 						int key_num = i*8+pos;
+						
 						if (key_num == key_on_num) {
 							on_key_state = 1;
 						}
 						if (mode == TOGGLE && key_num == key_off_num) {
 							off_key_state = 1;
+						}
+						
+						if (key_num != key_on_num && key_num != key_off_num) {
+							stored_keys[stored_keys_count++] = key_num;
 						}
 					}
 					
@@ -262,15 +292,15 @@ int main(const int argc, const char **argv)
 			if (key_on_num == key_off_num) {
 				if (last_key_state == 1 && on_key_state == 0) {
 					last_key_state = 0;
-					on_key_state = 0;
-					off_key_state = 0;
+					on_key_state   = 0;
+					off_key_state  = 0;
 				} else if (last_key_state == 0 && on_key_state == 1) {
 					last_key_state = 1;
-					on_key_state = 1;
-					off_key_state = 1;
+					on_key_state   = 1;
+					off_key_state  = 1;
 				} else {
-					on_key_state = 0;
-					off_key_state = 0;
+					on_key_state   = 0;
+					off_key_state  = 0;
 				}
 			}
 			
@@ -283,6 +313,7 @@ int main(const int argc, const char **argv)
 			} else {
 				if (off_key_state == 1) {
 					last_state = 0;
+					trig_off_keys(dpy, &stored_keys_count, stored_keys);
 					run_script(off_bin_cache);
 					printf("Off\n");
 				}
@@ -296,6 +327,7 @@ int main(const int argc, const char **argv)
 					run_script(on_bin_cache);
 					printf("On\n");
 				} else {
+					trig_off_keys(dpy, &stored_keys_count, stored_keys);
 					run_script(off_bin_cache);
 					printf("Off\n");
 				}
