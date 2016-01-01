@@ -180,7 +180,6 @@ void show_help()
 
 typedef enum { TOGGLE, MODIFIER } app_mode;
 
-/* #include <X11/keysym.h> */
 void trig_off_keys(
 	Display *dpy,
 	const int *stored_keys_count,
